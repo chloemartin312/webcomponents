@@ -268,6 +268,10 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
           --simple-toolbar-button-padding: 3px 6px;
           --simple-toolbar-border-radius: 0;
         }
+        .toolbar-buttons haxcms-button-add {
+          background-color: var(--ddd-theme-default-skyBlue);
+          color: white;
+        }
         .toolbar-buttons simple-toolbar-menu {
           --a11y-menu-button-bg-color: light-dark(
             var(--ddd-theme-default-white),
@@ -1202,7 +1206,7 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
                           modal: true,
                           styles: {
                             "--simple-modal-titlebar-background": "transparent",
-                            "--simple-modal-titlebar-color": "black",
+                            "--simple-modal-titlebar-color": "light-dark(black, white)",
                             "--simple-modal-width": "90vw",
                             "--simple-modal-min-width": "300px",
                             "--simple-modal-z-index": "100000000",
@@ -1738,7 +1742,8 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
         machineName: "move-page",
         placeholder: "Type to filter pages",
         program: async (input, values) => {
-          const pageId = values.pageId;
+          // Get pageId from values or fall back to active item
+          const pageId = values.pageId || (store.activeItem ? store.activeItem.id : null);
           if (!pageId) {
             return [
               {
@@ -1777,8 +1782,9 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
           // Add option to move to root level
           if (
             !searchTerm ||
-            "root".includes(searchTerm) ||
-            "top level".includes(searchTerm)
+            searchTerm.includes("root") ||
+            searchTerm.includes("top") ||
+            searchTerm.includes("level")
           ) {
             results.push({
               title: "Move to Root Level",
@@ -1835,7 +1841,7 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
             }
 
             results.push({
-              title: `${distance}${distance ? " " : ""}Move under "${item.title}"`,
+              title: `${distance}${distance ? " " : ""}${item.title}`,
               icon: "hax:add-child-page",
               tags: ["move", "parent"],
               value: {
@@ -4924,7 +4930,7 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
         title: this.t.insights,
         styles: {
           "--simple-modal-titlebar-background": "black",
-          "--simple-modal-titlebar-color": "var(--hax-ui-background-color)",
+          "--simple-modal-titlebar-color": "light-dark(black, white)",
           "--simple-modal-width": "94vw",
           "--simple-modal-min-width": "300px",
           "--simple-modal-z-index": "100000000",
@@ -5000,10 +5006,10 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
       composed: true,
       cancelable: false,
       detail: {
-        title: "Are you sure you want to delete this page?",
+        title: "Permanently delete this page?",
         styles: {
           "--simple-modal-titlebar-background": "black",
-          "--simple-modal-titlebar-color": "var(--hax-ui-background-color)",
+          "--simple-modal-titlebar-color": "light-dark(black, white)",
           "--simple-modal-width": "25vw",
           "--simple-modal-min-width": "300px",
           "--simple-modal-z-index": "100000000",
@@ -5047,12 +5053,11 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
       globalThis.SuperDaemonManager.requestAvailability();
     store.playSound("click");
     SuperDaemonInstance.waveWand([
-      currentTitle,
+      currentTitle,  // Pre-fill input with current title
       "/",
       {},
       "edit-title",
       "Edit title",
-      "",
     ]);
   }
   /**
@@ -5225,7 +5230,7 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
         title: this.t.outlineDesigner,
         styles: {
           "--simple-modal-titlebar-background": "black",
-          "--simple-modal-titlebar-color": "var(--hax-ui-background-color)",
+          "--simple-modal-titlebar-color": "light-dark(black, white)",
           "--simple-modal-z-index": "100000000",
           "--simple-modal-titlebar-height": "80px",
           "--simple-modal-width": "85vw",
@@ -5273,7 +5278,7 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
           title: this.t.siteSettings,
           styles: {
             "--simple-modal-titlebar-background": "black",
-            "--simple-modal-titlebar-color": "var(--hax-ui-background-color)",
+            "--simple-modal-titlebar-color": "light-dark(black, white)",
             "--simple-modal-z-index": "100000000",
             "--simple-modal-titlebar-height": "80px",
             "--simple-modal-width": "85vw",

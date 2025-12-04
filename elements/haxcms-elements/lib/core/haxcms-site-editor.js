@@ -49,22 +49,6 @@ class HAXCMSSiteEditor extends LitElement {
       this.manifest = toJS(store.manifest);
       this.__disposer.push(reaction);
     });
-    autorun((reaction) => {
-      this.activeItem = toJS(store.activeItem);
-      const baseUrl = toJS(store.location.baseUrl);
-      // account for haxiam vs non-haxiam
-      if (baseUrl && this.activeItem && this.activeItem.location) {
-        const sitePathAry = baseUrl.replace("/sites", "").split("/");
-        if (sitePathAry.length === 5) {
-          HAXStore.revisionHistoryLink = `/${sitePathAry[2]}/gitlist/${sitePathAry[3]}/logpatch/master/${this.activeItem.location}`;
-        } else if (sitePathAry.length === 4) {
-          HAXStore.revisionHistoryLink = `/${sitePathAry[1]}/gitlist/${sitePathAry[2]}/logpatch/master/${this.activeItem.location}`;
-        } else if (sitePathAry.length === 3) {
-          HAXStore.revisionHistoryLink = `/gitlist/${sitePathAry[1]}/logpatch/master/${this.activeItem.location}`;
-        }
-      }
-      this.__disposer.push(reaction);
-    });
   }
   // render function
   render() {
@@ -841,7 +825,7 @@ class HAXCMSSiteEditor extends LitElement {
                     modal: true,
                     styles: {
                       "--simple-modal-titlebar-background": "transparent",
-                      "--simple-modal-titlebar-color": "black",
+                      "--simple-modal-titlebar-color": "light-dark(black, white)",
                       "--simple-modal-width": "90vw",
                       "--simple-modal-min-width": "300px",
                       "--simple-modal-z-index": "100000000",
