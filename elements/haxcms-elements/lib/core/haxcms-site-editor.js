@@ -49,6 +49,11 @@ class HAXCMSSiteEditor extends LitElement {
       this.manifest = toJS(store.manifest);
       this.__disposer.push(reaction);
     });
+    // Sync activeItem directly from store via MobX for proper state management
+    autorun((reaction) => {
+      this.activeItem = toJS(store.activeItem);
+      this.__disposer.push(reaction);
+    });
   }
   // render function
   render() {
@@ -554,11 +559,9 @@ class HAXCMSSiteEditor extends LitElement {
       { signal: this.windowControllers.signal },
     );
 
-    globalThis.addEventListener(
-      "json-outline-schema-active-item-changed",
-      this._newActiveItem.bind(this),
-      { signal: this.windowControllers.signal },
-    );
+    // Note: activeItem is now synced via MobX autorun in constructor
+    // The json-outline-schema-active-item-changed event is still fired by the store
+    // for backward compatibility with external consumers
 
     globalThis.addEventListener(
       "json-outline-schema-active-body-changed",
@@ -958,13 +961,6 @@ class HAXCMSSiteEditor extends LitElement {
     }
   }
   /**
-   * update the internal active item
-   */
-
-  _newActiveItem(e) {
-    this.activeItem = e.detail;
-  }
-  /**
    * active item changed
    */
 
@@ -1134,7 +1130,19 @@ class HAXCMSSiteEditor extends LitElement {
         this._restoreKeepEditMode = false;
       }
 
+      // CRITICAL FIX: Force page-break element to use store activeItem values
+      // before serialization to prevent & -> &amp; encoding issues
+      const pageBreakEl = HAXStore.activeHaxBody.querySelector('page-break');
+      if (pageBreakEl && this.activeItem) {
+        // Directly set the JavaScript properties from the source of truth (store)
+        // This ensures we're not using the already-encoded attribute values
+        pageBreakEl.title = this.activeItem.title || '';
+        pageBreakEl.description = this.activeItem.description || '';
+      }
+      
       let body = await HAXStore.activeHaxBody.haxToContent();
+      const schema = await HAXStore.htmlToHaxElements(body);
+      
       this.querySelector("#nodeupdateajax").body = {
         jwt: this.jwt,
         site: {
@@ -1143,7 +1151,7 @@ class HAXCMSSiteEditor extends LitElement {
         node: {
           id: this.activeItem.id,
           body: body,
-          schema: await HAXStore.htmlToHaxElements(body),
+          schema: schema,
         },
       };
       this.setProcessingVisual();

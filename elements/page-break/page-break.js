@@ -262,6 +262,11 @@ export class PageBreak extends IntersectionObserverMixin(
       this.remoteHeadingobserver.disconnect();
     }
     this.target = newTarget;
+    // Validate that target is a valid DOM Node before observing
+    if (!this.target || !(this.target instanceof Node)) {
+      console.warn('page-break: setupTargetData called with invalid target', this.target);
+      return;
+    }
     // add a backdoor for hax to have a hook into this
     this._haxSibling = this;
     // @todo need to add some kind of "if this gets deleted let me know"
@@ -500,6 +505,10 @@ export class PageBreak extends IntersectionObserverMixin(
             opacity 0.2s ease-in-out,
             border-color 0.2s ease-in-out,
             background-color 0.2s ease-in-out;
+        }
+        /* Increase bottom margin when link URL is present to prevent clipping */
+        :host([data-hax-ray][link-url]) {
+          margin-bottom: var(--ddd-spacing-24);
         }
         :host([data-hax-ray]:hover) {
           opacity: 1;
@@ -860,13 +869,10 @@ export class PageBreak extends IntersectionObserverMixin(
       globalThis.SuperDaemonManager.requestAvailability();
     store.playSound("click");
 
-    // Get the current title
-    const currentTitle = item.title || this.title || "";
-
-    // Invoke the core edit-title program
-    // The program will pull current title from store and show it as default option
+    // Trigger the edit-title program
+    // The program will automatically show the current title from the store
     SuperDaemonInstance.waveWand([
-      currentTitle,  // Pre-fill input with current title
+      "",  // Empty input - let program show current title
       "/",
       {},
       "edit-title",
