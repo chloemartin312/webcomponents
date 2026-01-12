@@ -70,6 +70,10 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
         :host *[hidden] {
           display: none;
         }
+        /* Ensure Add Page button is never visible while actively editing */
+        :host([edit-mode]) #addpagebutton {
+          display: none;
+        }
         simple-tooltip:not(:defined) {
           display: none !important;
         }
@@ -267,6 +271,10 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
           --simple-toolbar-button-disabled-opacity: 0.3;
           --simple-toolbar-button-padding: 3px 6px;
           --simple-toolbar-border-radius: 0;
+        }
+        /* Visually indicate which HAX content tab is active (config / blocks / map / source) */
+        .toolbar-buttons simple-toolbar-button[active] {
+          --simple-icon-color: var(--ddd-theme-default-skyBlue);
         }
         .toolbar-buttons haxcms-button-add {
           background-color: var(--ddd-theme-default-skyBlue);
@@ -1423,6 +1431,20 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
 
   // Create page with title - method called by Merlin programs
   async createPageWithTitle(title, type, templateContent = null) {
+    // When invoked from the create-page Merlin program, always prefer the
+    // live Merlin input value so rapid typing + Enter uses the latest text.
+    const SuperDaemonInstance =
+      globalThis.SuperDaemonManager &&
+      globalThis.SuperDaemonManager.requestAvailability();
+    if (
+      SuperDaemonInstance &&
+      SuperDaemonInstance.programName === "create-page" &&
+      SuperDaemonInstance.value &&
+      SuperDaemonInstance.value.trim() !== ""
+    ) {
+      title = SuperDaemonInstance.value.trim();
+    }
+
     let order = null;
     let parent = null;
     const item = toJS(store.activeItem);
@@ -2810,8 +2832,7 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
             voice-command="(modify)(configure)(edit) selected"
             controls="tray-detail"
             tooltip="${this.t.configure} ${this.activeTagName}"
-            toggles
-            ?toggled="${this.trayDetail === "content-edit"}"
+            ?active="${this.trayDetail === "content-edit"}"
             icon-position="${this.getIconPosition(this.responsiveSize)}"
           >
           </simple-toolbar-button>
@@ -2824,8 +2845,7 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
             class="top-bar-button"
             label="${this.t.addBlock} • Ctrl⇧2"
             voice-command="select blocks (menu)"
-            toggles
-            ?toggled="${this.trayDetail === "content-add"}"
+            ?active="${this.trayDetail === "content-add"}"
             icon-position="${this.getIconPosition(this.responsiveSize)}"
             @click="${this.haxButtonOp}"
           >
@@ -2839,9 +2859,8 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
             class="top-bar-button"
             label="${this.t.pageOutline} • Ctrl⇧3"
             voice-command="select content outline (menu)"
-            toggles
             @click="${this.haxButtonOp}"
-            ?toggled="${this.trayDetail === "content-map"}"
+            ?active="${this.trayDetail === "content-map"}"
             icon-position="${this.getIconPosition(this.responsiveSize)}"
           >
           </simple-toolbar-button>
@@ -2857,6 +2876,7 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
             icon-position="${this.getIconPosition(this.responsiveSize)}"
             ?hidden="${!this.editMode}"
             ?disabled="${!this.editMode}"
+            ?active="${this.trayDetail === "view-source"}"
           >
           </simple-toolbar-button>
 
@@ -4140,7 +4160,7 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
             "👋 Welcome to HAX! Merlin is here to help you get started",
             8000,
             {
-              hat: "wizard",
+              hat: "knight",
             },
           );
         } else {
@@ -4167,7 +4187,7 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
       "Welcome program dismissed. You can always access Merlin by pressing Alt+Shift or clicking the search bar.",
       5000,
       {
-        hat: "check",
+        hat: "good",
       },
     );
   }
@@ -4490,6 +4510,15 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
         type: Object,
       },
       /**
+       * Current active tray detail (content-edit, content-add, content-map, view-source)
+       * mirrored from HAXStore.haxTray.trayDetail so the top bar can expose state
+       */
+      trayDetail: {
+        type: String,
+        attribute: "tray-detail",
+        reflect: true,
+      },
+      /**
        * Whether we're currently on an internal route
        */
       onInternalRoute: {
@@ -4511,6 +4540,14 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
     this._registerKeyboardShortcuts();
     HAXCMSKeyboardShortcutsInstance.enable();
 
+    // Mirror HAX tray detail into this element so we can expose and style active state.
+    // IMPORTANT: use the observable HAXStore.trayDetail, not haxTray.trayDetail,
+    // so MobX actually tracks and updates this value.
+    autorun((reaction) => {
+      this.trayDetail = toJS(HAXStore.trayDetail);
+      this.__disposer.push(reaction);
+    });
+
     autorun((reaction) => {
       if (store.userData) {
         this.userName = toJS(store.userData.userName);
@@ -4521,8 +4558,24 @@ class HAXCMSSiteEditorUI extends HAXCMSThemeParts(
       this.__disposer.push(reaction);
     });
     autorun((reaction) => {
-      this.editMode = toJS(store.editMode);
+      const previousEditMode = this.editMode;
+      const newEditMode = toJS(store.editMode);
+      this.editMode = newEditMode;
       UserScaffoldInstance.writeMemory("editMode", this.editMode);
+      // When we first enter edit mode and there is an active node selected,
+      // prefer the Configure tab over Blocks as the default tray panel.
+      if (
+        !previousEditMode &&
+        newEditMode &&
+        HAXStore.activeNode &&
+        HAXStore.activeNode.tagName
+      ) {
+        HAXStore.trayDetail = "content-edit";
+        if (HAXStore.haxTray) {
+          HAXStore.haxTray.trayDetail = "content-edit";
+          HAXStore.haxTray.collapsed = false;
+        }
+      }
       this.__disposer.push(reaction);
     });
     autorun((reaction) => {

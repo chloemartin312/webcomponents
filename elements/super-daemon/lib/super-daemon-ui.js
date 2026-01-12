@@ -514,12 +514,30 @@ export class SuperDaemonUI extends SimpleFilterMixin(I18NMixin(SimpleColors)) {
 
   // feed results to the program as opposed to the global context based on program running
   inputfilterChanged(e) {
+    const value =
+      e.target && typeof e.target.value === "string" ? e.target.value : "";
+
     if (this.programName) {
-      // don't set like if we're in a program
-      this.programSearch = e.target.value;
+      // don't set like if we're in a program; the active program is
+      // responsible for filtering its own results based on input, and
+      // SimpleFilterMixin should see all programResults unfiltered.
+      this.programSearch = value;
     } else {
-      this.like = e.target.value;
+      this.like = value;
     }
+
+    // Bubble a normalized value-changed event so the top-level super-daemon
+    // instance always has the live input text (used for create-page titles
+    // and other programs that depend on the raw input).
+    this.dispatchEvent(
+      new CustomEvent("value-changed", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          value: value,
+        },
+      }),
+    );
   }
 
   listeningForInputChanged(e) {

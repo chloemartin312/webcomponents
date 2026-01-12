@@ -31,6 +31,7 @@ export class AppHaxSiteCreationModal extends DDDSuper(LitElement) {
     this.creationCancelled = false;
     this.promises = [];
     this.max = 100;
+    this.skeletonData = null;
   }
 
   static get properties() {
@@ -51,6 +52,7 @@ export class AppHaxSiteCreationModal extends DDDSuper(LitElement) {
       creationCancelled: { type: Boolean },
       promises: { type: Array },
       max: { type: Number },
+      skeletonData: { type: Object },
     };
   }
 
@@ -513,7 +515,8 @@ export class AppHaxSiteCreationModal extends DDDSuper(LitElement) {
   openModal() {
     this.open = true;
     this.currentStep = 1;
-    this.siteName = "";
+    // Preserve any prepopulated siteName from the caller; default to empty string
+    this.siteName = this.siteName || "";
     this.errorMessage = "";
     this.showConfetti = false;
     this.isCreating = false;
@@ -538,6 +541,10 @@ export class AppHaxSiteCreationModal extends DDDSuper(LitElement) {
           this.shadowRoot && this.shadowRoot.querySelector(".form-input");
         if (input) {
           input.focus();
+          // Select the full value so it's easy to overwrite via keyboard
+          if (typeof input.select === "function") {
+            input.select();
+          }
         }
       }, 100);
     });
@@ -574,6 +581,7 @@ export class AppHaxSiteCreationModal extends DDDSuper(LitElement) {
     this.creationCancelled = false;
     this.siteUrl = "";
     this.themeElement = "";
+    this.skeletonData = null;
 
     this.dispatchEvent(
       new CustomEvent("modal-closed", {
@@ -609,6 +617,7 @@ export class AppHaxSiteCreationModal extends DDDSuper(LitElement) {
     this.creationCancelled = false;
     this.siteUrl = "";
     this.themeElement = "";
+    this.skeletonData = null;
 
     this.dispatchEvent(
       new CustomEvent("modal-closed", {
@@ -655,8 +664,24 @@ export class AppHaxSiteCreationModal extends DDDSuper(LitElement) {
 
     // Set up the site data in store for the API call
     store.site.name = this.siteName;
-    store.site.structure = this.themeElement || "website"; // Use theme element (machine name)
-    store.site.type = "own";
+    // If skeleton data exists, use its build configuration
+    if (this.skeletonData && this.skeletonData.build) {
+      store.site.structure =
+        this.skeletonData.build.structure || "from-skeleton";
+      store.site.type = this.skeletonData.build.type || "skeleton";
+      // Pass skeleton items and files to store for API formatting
+      if (this.skeletonData.build.items) {
+        store.items = this.skeletonData.build.items;
+      }
+      if (this.skeletonData.build.files) {
+        store.itemFiles = this.skeletonData.build.files;
+      }
+    } else {
+      store.site.structure = this.themeElement || "website";
+      store.site.type = "own";
+      store.items = null;
+      store.itemFiles = null;
+    }
     store.site.theme = this.themeElement || "polaris-flex-theme"; // Use selected theme
 
     this.currentStep = 2;
@@ -757,6 +782,16 @@ export class AppHaxSiteCreationModal extends DDDSuper(LitElement) {
 
       this.showConfetti = true;
       this.generateConfetti();
+
+      // After success UI renders, move focus to the primary action (Go to Site)
+      this.updateComplete.then(() => {
+        const goToSiteButton =
+          this.shadowRoot &&
+          this.shadowRoot.querySelector(".button.button-success");
+        if (goToSiteButton) {
+          goToSiteButton.focus();
+        }
+      });
 
       // Trigger confetti on main page
       this.triggerMainPageConfetti();

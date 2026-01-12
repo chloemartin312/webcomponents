@@ -1012,7 +1012,13 @@ class HAXCMSSiteEditor extends LitElement {
 
       // Restore active element position after DOM update for "keep editing" mode
       if (this._restoreKeepEditMode && this._restoreActiveIndex !== null) {
-        setTimeout(() => {
+        // Clean up any existing listener to prevent duplicates
+        if (this._contentReadyHandler) {
+          HAXStore.activeHaxBody.removeEventListener('hax-body-content-ready', this._contentReadyHandler);
+        }
+        
+        // Wait for hax-body content-ready event instead of arbitrary timeout
+        this._contentReadyHandler = () => {
           try {
             if (HAXStore.activeHaxBody && HAXStore.activeHaxBody.children) {
               const bodyChildren = Array.from(HAXStore.activeHaxBody.children);
@@ -1038,6 +1044,21 @@ class HAXCMSSiteEditor extends LitElement {
                 }
               }
             }
+            
+            // Force UI component to re-render to update button visibility
+            // editMode stayed true, so autorun won't fire - need manual update
+            // Use RAF to ensure DOM is settled before requesting update
+            requestAnimationFrame(() => {
+              const uiElement = globalThis.document.querySelector('haxcms-site-editor-ui');
+              if (uiElement) {
+                // Force observable to fire by toggling and restoring
+                const currentMode = store.editMode;
+                store.editMode = false;
+                requestAnimationFrame(() => {
+                  store.editMode = currentMode;
+                });
+              }
+            });
           } catch (error) {
             console.warn(
               "Failed to restore active element position after save:",
@@ -1047,7 +1068,13 @@ class HAXCMSSiteEditor extends LitElement {
           // Clean up the restoration flags
           this._restoreActiveIndex = null;
           this._restoreKeepEditMode = false;
-        }, 100); // Small delay to ensure DOM is fully updated
+          this._contentReadyHandler = null;
+        };
+        
+        // Listen for content-ready event from hax-body
+        if (HAXStore.activeHaxBody) {
+          HAXStore.activeHaxBody.addEventListener('hax-body-content-ready', this._contentReadyHandler, { once: true });
+        }
       }
 
       // force an update in the store to reprocess what is "active"
@@ -1130,16 +1157,9 @@ class HAXCMSSiteEditor extends LitElement {
         this._restoreKeepEditMode = false;
       }
 
-      // CRITICAL FIX: Force page-break element to use store activeItem values
-      // before serialization to prevent & -> &amp; encoding issues
-      const pageBreakEl = HAXStore.activeHaxBody.querySelector('page-break');
-      if (pageBreakEl && this.activeItem) {
-        // Directly set the JavaScript properties from the source of truth (store)
-        // This ensures we're not using the already-encoded attribute values
-        pageBreakEl.title = this.activeItem.title || '';
-        pageBreakEl.description = this.activeItem.description || '';
-      }
-      
+      // Serialize current DOM content (including page-break) as-is. Entity
+      // normalization for attributes like title/description is handled on
+      // the backend so we do not clobber freshly edited values here.
       let body = await HAXStore.activeHaxBody.haxToContent();
       const schema = await HAXStore.htmlToHaxElements(body);
       
